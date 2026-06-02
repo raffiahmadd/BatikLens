@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BatikLens - Smart AI Heritage Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script async src="https://cdn.jsdelivr.net/gh/wallat/compiled-opencvjs/v4.2.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-[#0C0704] text-[#FDFBF7] font-['Plus_Jakarta_Sans'] min-h-screen overflow-x-hidden">
+
+    <div class="fixed inset-0 bg-batik-texture opacity-[0.06] pointer-events-none z-0"></div>
+
+    <div id="auth-screen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gradient-to-br from-[#1A0F08] via-[#0C0704] to-[#000000]">
+        <div class="relative w-full max-w-md p-8 glass-card border border-[#D4AF37]/20 rounded-3xl shadow-2xl text-center z-10 animate-fade-in">
+            <div class="relative w-16 h-16 mx-auto mb-4 bg-gradient-to-tr from-[#5C3A21] via-[#D4AF37] to-[#AA7C11] rounded-2xl flex items-center justify-center shadow-lg">
+                <i class="fa-solid fa-camera-retro text-2xl text-[#0C0704]"></i>
+            </div>
+            <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-[#FDFBF7] via-[#D4AF37] to-[#AA7C11] bg-clip-text text-transparent">BatikLens</h1>
+            <p id="auth-subtitle" class="text-gray-400 text-xs mt-1 mb-6 font-medium">Masuk untuk menjelajah warisan Nusantara</p>
+
+            <div id="auth-alert" class="hidden mb-4 p-3 rounded-lg text-xs font-bold text-left"></div>
+
+            <div id="login-form" class="space-y-4 text-left">
+                <div>
+                    <label class="text-[10px] font-bold text-[#D4AF37] uppercase block mb-1">Email</label>
+                    <input type="email" id="login-email" placeholder="contoh@email.com" class="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-[#D4AF37] text-sm text-white">
+                </div>
+                <div class="relative">
+                    <label class="text-[10px] font-bold text-[#D4AF37] uppercase block mb-1">Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••" class="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-[#D4AF37] text-sm text-white">
+                    <button type="button" onclick="togglePassword('login-password')" class="absolute right-4 top-8 text-gray-400 hover:text-white"><i class="fa-solid fa-eye"></i></button>
+                </div>
+                <div class="flex justify-between items-center text-xs">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="remember-me" class="accent-[#D4AF37]">
+                        <span class="text-gray-400">Ingat saya</span>
+                    </label>
+                    <button onclick="resetPassword()" class="text-[#D4AF37] hover:underline">Lupa Password?</button>
+                </div>
+                <button onclick="loginWithEmail()" id="btn-login" class="w-full py-3 mt-2 bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] text-[#0C0704] font-bold rounded-xl shadow-md hover:opacity-90 transition active:scale-95 duration-200 text-sm">Masuk Sistem</button>
+                
+                <div class="flex items-center gap-3 my-4">
+                    <hr class="flex-1 border-white/10"><span class="text-xs text-gray-500">ATAU</span><hr class="flex-1 border-white/10">
+                </div>
+                
+                <button onclick="loginWithGoogle()" class="w-full flex items-center justify-center gap-3 py-3 bg-white text-gray-900 font-bold rounded-xl shadow-md hover:bg-gray-100 transition active:scale-95 duration-200 text-sm">
+                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="Google"> Masuk dengan Google
+                </button>
+                
+                <p class="text-center text-xs text-gray-400 mt-4">Belum punya akun? <button onclick="toggleAuthMode('register')" class="text-[#D4AF37] font-bold hover:underline">Daftar di sini</button></p>
+            </div>
+
+            <div id="register-form" class="hidden space-y-4 text-left">
+                <div>
+                    <label class="text-[10px] font-bold text-[#D4AF37] uppercase block mb-1">Nama Lengkap</label>
+                    <input type="text" id="reg-name" placeholder="Nama Anda" class="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-[#D4AF37] text-sm text-white">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-[#D4AF37] uppercase block mb-1">Email</label>
+                    <input type="email" id="reg-email" placeholder="contoh@email.com" class="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-[#D4AF37] text-sm text-white">
+                </div>
+                <div class="relative">
+                    <label class="text-[10px] font-bold text-[#D4AF37] uppercase block mb-1">Password</label>
+                    <input type="password" id="reg-password" placeholder="Minimal 6 karakter" class="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-[#D4AF37] text-sm text-white">
+                    <button type="button" onclick="togglePassword('reg-password')" class="absolute right-4 top-8 text-gray-400 hover:text-white"><i class="fa-solid fa-eye"></i></button>
+                </div>
+                <button onclick="registerWithEmail()" id="btn-register" class="w-full py-3 mt-2 bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] text-[#0C0704] font-bold rounded-xl shadow-md hover:opacity-90 transition active:scale-95 duration-200 text-sm">Buat Akun</button>
+                <p class="text-center text-xs text-gray-400 mt-4">Sudah punya akun? <button onclick="toggleAuthMode('login')" class="text-[#D4AF37] font-bold hover:underline">Masuk</button></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-app" class="hidden min-h-screen flex flex-col pb-24 md:pb-0 md:pl-64 z-10 relative">
+        <aside class="hidden md:flex fixed inset-y-0 left-0 w-64 bg-[#140D09] border-r border-[#D4AF37]/10 flex-col justify-between p-6 z-40">
+            <div class="space-y-8">
+                <div class="flex items-center gap-3 px-2">
+                    <div class="w-8 h-8 bg-[#D4AF37] rounded-lg flex items-center justify-center text-[#140D09] font-bold"><i class="fa-solid fa-camera-retro text-sm"></i></div>
+                    <span class="text-xl font-black bg-gradient-to-r from-white via-[#D4AF37] to-[#AA7C11] bg-clip-text text-transparent">BatikLens</span>
+                </div>
+                <nav class="space-y-2">
+                    <button id="side-home" onclick="switchTab('home')" class="nav-btn w-full flex items-center gap-4 px-4 py-3 rounded-xl transition active-nav text-[#D4AF37]"><i class="fa-solid fa-house w-5"></i> Beranda</button>
+                    <button id="side-scan" onclick="switchTab('scan')" class="nav-btn w-full flex items-center gap-4 px-4 py-3 rounded-xl transition text-gray-400"><i class="fa-solid fa-expand w-5"></i> Pindai AI Cerdas</button>
+                    <button id="side-profile" onclick="switchTab('profile')" class="nav-btn w-full flex items-center gap-4 px-4 py-3 rounded-xl transition text-gray-400"><i class="fa-solid fa-users w-5"></i> Tim Pengembang</button>
+                </nav>
+            </div>
+            <div class="border-t border-white/5 pt-4">
+                <div class="flex items-center gap-3 mb-4 px-2">
+                    <img id="user-avatar" src="https://via.placeholder.com/150" class="w-8 h-8 rounded-full border border-[#D4AF37]">
+                    <div class="text-left"><p id="user-name-display" class="text-xs font-bold text-white truncate w-32">User</p><p class="text-[9px] text-[#D4AF37]">Active</p></div>
+                </div>
+                <button onclick="logout()" class="w-full flex items-center gap-4 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition font-medium text-sm"><i class="fa-solid fa-right-from-bracket"></i> Keluar</button>
+            </div>
+        </aside>
+
+        <header class="md:hidden flex items-center justify-between p-4 bg-[#140D09] border-b border-[#D4AF37]/10 sticky top-0 z-30 backdrop-blur-md">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-camera-retro text-[#D4AF37]"></i>
+                <span class="font-extrabold text-white">BatikLens</span>
+            </div>
+            <button onclick="logout()" class="text-red-400 text-sm"><i class="fa-solid fa-right-from-bracket text-lg"></i></button>
+        </header>
+
+        <main class="flex-grow p-4 md:p-8 max-w-6xl w-full mx-auto relative">
+            
+            <section id="tab-home" class="space-y-8 animate-fade-in">
+                <div class="relative bg-gradient-to-br from-[#2b180d] to-[#140D09] border border-[#D4AF37]/20 rounded-3xl p-6 md:p-10 shadow-2xl overflow-hidden">
+                    <div class="absolute right-0 top-0 w-64 h-64 bg-[url('https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Batik_Kraton.jpg/320px-Batik_Kraton.jpg')] opacity-10 bg-cover rounded-bl-full mix-blend-luminosity"></div>
+                    <div class="relative z-10 max-w-2xl">
+                        <span class="px-3 py-1 bg-[#D4AF37]/10 text-[#D4AF37] text-[10px] font-extrabold rounded-full tracking-widest uppercase border border-[#D4AF37]/30">Warisan Nusantara</span>
+                        <h1 class="text-3xl md:text-5xl font-black mt-4 mb-4 leading-tight">Kenali & Lestarikan <br><span class="text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] to-[#f9d77e]">Identitas Batik Indonesia</span></h1>
+                        <p class="text-sm text-gray-300 mb-6 leading-relaxed">Aplikasi cerdas berbasis Artificial Intelligence dan Computer Vision (C-VIS) yang mampu mengidentifikasi lebih dari 20 motif batik lokal secara real-time tanpa koneksi server eksternal.</p>
+                        <button onclick="switchTab('scan')" class="px-6 py-3 bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] text-[#0C0704] font-bold rounded-xl shadow-lg hover:scale-105 transition-transform duration-300"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Mulai Pindai Sekarang</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-[#140D09] border border-white/5 p-5 rounded-2xl flex flex-col items-center text-center hover:border-[#D4AF37]/30 transition-colors">
+                        <div class="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center text-[#D4AF37] mb-3 text-xl"><i class="fa-solid fa-bolt"></i></div>
+                        <h3 class="font-bold text-sm text-white mb-1">Pemrosesan Lokal (C-VIS)</h3>
+                        <p class="text-[11px] text-gray-400">Algoritma berjalan 100% di browser Anda, menjamin kecepatan dan privasi data.</p>
+                    </div>
+                    <div class="bg-[#140D09] border border-white/5 p-5 rounded-2xl flex flex-col items-center text-center hover:border-[#D4AF37]/30 transition-colors">
+                        <div class="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center text-[#D4AF37] mb-3 text-xl"><i class="fa-solid fa-layer-group"></i></div>
+                        <h3 class="font-bold text-sm text-white mb-1">20+ Klasifikasi Motif</h3>
+                        <p class="text-[11px] text-gray-400">Mampu mendeteksi berbagai rumpun warna dari keraton hingga pesisiran.</p>
+                    </div>
+                    <div class="bg-[#140D09] border border-white/5 p-5 rounded-2xl flex flex-col items-center text-center hover:border-[#D4AF37]/30 transition-colors">
+                        <div class="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center text-[#D4AF37] mb-3 text-xl"><i class="fa-solid fa-file-export"></i></div>
+                        <h3 class="font-bold text-sm text-white mb-1">Laporan Komprehensif</h3>
+                        <p class="text-[11px] text-gray-400">Ekspor hasil pindaian beserta filosofinya ke dalam format PDF dan Word (Docx).</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-scan" class="hidden space-y-6 animate-fade-in">
+                <div>
+                    <h2 class="text-2xl font-black tracking-tight flex items-center gap-2"><i class="fa-solid fa-expand text-[#D4AF37]"></i> Laboratorium Pindai AI</h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Deteksi kamera langsung atau unggah gambar untuk analisis filosofi motif.</p>
+                </div>
+
+                <div id="cv-status" class="bg-amber-900/30 border border-amber-500/50 p-3 rounded-xl flex items-center gap-3">
+                    <i class="fa-solid fa-microchip text-amber-500 animate-pulse"></i>
+                    <p class="text-xs font-bold text-amber-200" id="cv-status-text">Memuat Modul AI (OpenCV.js)... Mohon tunggu.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                    <div class="bg-[#140D09] border border-[#D4AF37]/20 rounded-3xl overflow-hidden shadow-xl aspect-video md:aspect-square relative flex flex-col items-center justify-center p-6 min-h-[350px]">
+                        
+                        <div id="input-selection" class="flex flex-col items-center w-full gap-4">
+                            <button onclick="startLiveCamera()" class="w-full py-4 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-[#D4AF37]/20 transition">
+                                <i class="fa-solid fa-video text-3xl text-[#D4AF37]"></i>
+                                <span class="font-bold text-sm text-amber-100">Gunakan Kamera Langsung</span>
+                            </button>
+                            <label for="file-input" class="w-full py-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-white/10 transition cursor-pointer">
+                                <i class="fa-solid fa-image text-3xl text-gray-300"></i>
+                                <span class="font-bold text-sm text-gray-200">Unggah dari Galeri</span>
+                            </label>
+                            <input type="file" id="file-input" accept="image/*" class="hidden" onchange="handleFileUpload(event)">
+                        </div>
+
+                        <div id="camera-container" class="hidden absolute inset-0 bg-black z-10 flex flex-col">
+                            <video id="live-video" autoplay playsinline class="w-full h-full object-cover"></video>
+                            <div class="absolute inset-0 border-2 border-[#D4AF37]/50 m-8 rounded-xl border-dashed pointer-events-none opacity-50"></div>
+                            
+                            <div class="absolute bottom-4 inset-x-0 flex justify-center gap-4 px-4 z-20">
+                                <button onclick="stopLiveCamera()" class="w-12 h-12 bg-red-500/80 rounded-full flex items-center justify-center text-white backdrop-blur"><i class="fa-solid fa-xmark"></i></button>
+                                <button onclick="captureCamera()" class="w-16 h-16 bg-white rounded-full flex items-center justify-center border-4 border-gray-300 shadow-xl shadow-black/50"></button>
+                                <button onclick="switchCamera()" class="w-12 h-12 bg-black/60 rounded-full flex items-center justify-center text-white backdrop-blur border border-white/20"><i class="fa-solid fa-camera-rotate"></i></button>
+                            </div>
+                        </div>
+                        <canvas id="hidden-canvas" class="hidden"></canvas>
+                        
+                        <div id="upload-preview-container" class="hidden absolute inset-0 bg-[#140D09] z-10">
+                            <img id="upload-img-preview" class="w-full h-full object-cover" src="" alt="Preview">
+                            <div id="scanner-line" class="absolute left-0 w-full h-1 bg-[#D4AF37] shadow-[0_0_15px_#D4AF37] hidden z-20"></div>
+                            
+                            <div class="absolute bottom-4 inset-x-0 flex justify-center gap-3 z-30">
+                                <button onclick="resetInput()" class="px-4 py-2 bg-black/70 backdrop-blur-md text-white text-xs rounded-xl border border-white/10 font-bold"><i class="fa-solid fa-rotate mr-1"></i> Ganti</button>
+                                <button id="btn-start-scan" onclick="startAutoScan()" class="px-5 py-2 bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] text-[#0C0704] text-xs font-black rounded-xl shadow-md disabled:opacity-50"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Analisis C-VIS</button>
+                            </div>
+                        </div>
+
+                        <div id="ai-loading" class="hidden absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-4 z-40">
+                            <div class="relative w-12 h-12">
+                                <div class="absolute inset-0 border-4 border-[#D4AF37]/10 rounded-full"></div>
+                                <div class="absolute inset-0 border-4 border-t-[#D4AF37] rounded-full animate-spin"></div>
+                            </div>
+                            <p class="font-bold text-amber-100 text-xs tracking-wide animate-pulse text-center">Menjalankan Segmentasi HSV...<br><span class="text-[10px] text-gray-400 font-normal">Mengekstrak filosofi & sumber</span></p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div id="result-placeholder" class="bg-[#140D09] border border-dashed border-[#D4AF37]/20 rounded-3xl p-8 text-center flex flex-col items-center justify-center min-h-[350px]">
+                            <div class="w-12 h-12 rounded-full bg-[#D4AF37]/5 flex items-center justify-center text-[#D4AF37] mb-3"><i class="fa-solid fa-microscope text-xl"></i></div>
+                            <h3 class="font-bold text-sm text-gray-400">Menunggu Analisis Gambar</h3>
+                            <p class="text-[11px] text-gray-500 mt-1">Laporan identifikasi motif, filosofi, dan referensi Google Lens lokal akan muncul di sini.</p>
+                        </div>
+
+                        <div id="result-container-wrap" class="hidden animate-slide-in space-y-4">
+                            <div id="result-success-card" class="bg-[#1a110b] border border-[#D4AF37]/30 rounded-3xl overflow-hidden shadow-2xl p-6 space-y-5 relative">
+                                <div class="flex items-center gap-4">
+                                    <img id="res-thumbnail" class="w-20 h-20 md:w-24 md:h-24 object-cover rounded-xl border border-[#D4AF37]/40 shadow-lg" src="" alt="Thumbnail">
+                                    <div>
+                                        <span class="text-[10px] uppercase tracking-widest font-extrabold text-[#0C0704] bg-[#D4AF37] px-3 py-1 rounded-full"><i class="fa-solid fa-check-circle mr-1"></i> Identifikasi Sukses</span>
+                                        <h3 id="res-nama" class="text-xl md:text-2xl font-black mt-3 text-white tracking-tight leading-tight">Nama Motif</h3>
+                                    </div>
+                                </div>
+                                <hr class="border-white/5">
+                                <div class="bg-black/30 p-3 rounded-xl border border-white/5 flex items-center gap-2">
+                                    <i class="fa-solid fa-map-location-dot text-[#D4AF37]"></i>
+                                    <span id="res-asal" class="text-xs font-bold text-white">Daerah Asal</span>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <h4 class="text-[11px] uppercase text-[#D4AF37] font-bold tracking-widest flex items-center gap-1.5"><i class="fa-solid fa-align-left"></i> Karakteristik Visual</h4>
+                                    <div id="res-deskripsi" class="text-xs text-gray-300 leading-relaxed bg-black/20 p-3.5 rounded-xl border border-white/5 text-justify"></div>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <h4 class="text-[11px] uppercase text-[#D4AF37] font-bold tracking-widest flex items-center gap-1.5"><i class="fa-solid fa-heart-pulse"></i> Makna & Filosofi</h4>
+                                    <div id="res-filosofi" class="text-xs text-gray-300 leading-relaxed bg-black/20 p-3.5 rounded-xl border border-white/5 text-justify"></div>
+                                </div>
+                                <div class="space-y-1.5 pt-2 border-t border-white/5">
+                                    <h4 class="text-[11px] uppercase text-gray-400 font-bold tracking-widest flex items-center gap-1.5"><i class="fa-solid fa-globe"></i> Referensi & Sumber Pengetahuan</h4>
+                                    <ul id="res-sumber" class="text-[11px] space-y-2 list-none pl-1 mt-2"></ul>
+                                </div>
+                            </div>
+                            
+                            <div class="flex gap-3">
+                                <button onclick="exportToPDF()" class="flex-1 py-3 bg-red-900/40 border border-red-500/50 text-red-100 text-xs font-bold rounded-xl hover:bg-red-800/60 transition flex items-center justify-center gap-2"><i class="fa-solid fa-file-pdf"></i> Simpan PDF</button>
+                                <button onclick="exportToWord()" class="flex-1 py-3 bg-blue-900/40 border border-blue-500/50 text-blue-100 text-xs font-bold rounded-xl hover:bg-blue-800/60 transition flex items-center justify-center gap-2"><i class="fa-solid fa-file-word"></i> Simpan Word</button>
+                            </div>
+                        </div>
+
+                        <div id="result-error-card" class="hidden bg-gradient-to-br from-[#250B0B] via-[#140909] to-[#0A0303] border border-red-500/30 rounded-3xl p-6 shadow-2xl animate-slide-in">
+                            <div class="flex items-center gap-4">
+                                <img id="err-thumbnail" class="w-16 h-16 object-cover rounded-xl border border-red-500/30" src="" alt="Error">
+                                <div>
+                                    <div class="flex items-center gap-2 text-red-500 mb-1">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                        <h3 class="text-sm font-bold text-red-400">Objek Bukan Kain Batik</h3>
+                                    </div>
+                                    <p class="text-[10px] text-gray-400">Parameter warna HSV tidak memenuhi standar pigmen tekstil batik.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-profile" class="hidden space-y-8 animate-fade-in">
+
+    <div class="text-center md:text-left">
+    <h2 class="text-2xl font-black tracking-tight flex items-center justify-center md:justify-start gap-2">
+        <i class="fa-solid fa-users text-[#D4AF37]"></i> Tim Pengembang
+    </h2>
+    <p class="text-xs text-gray-400 mt-1">Inovator di balik sistem cerdas BatikLens.</p>
+</div>
+                
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+    
+    <div class="bg-[#140D09] border border-white/5 rounded-3xl p-6 pb-10 text-center hover:-translate-y-2 hover:border-[#D4AF37]/50 transition-all duration-300 shadow-xl group flex flex-col items-center">
+        <img src="/Assets/Raffi Almet.png" 
+             style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; transform: translateZ(0);"
+             class="w-36 h-48 rounded-2xl border-4 border-[#140D09] shadow-[0_0_0_2px_rgba(212,175,55,0.3)] mb-5 object-cover object-top antialiased">
+        <h3 class="font-bold text-white text-lg">Raffi Ahmad Dhinata</h3>
+        <p class="text-[10px] uppercase tracking-widest text-[#D4AF37] font-bold mb-3 mt-1">Universitas Negeri Malang</p>
+        <p class="text-xs text-gray-400 mb-6 line-clamp-3">Ketua Tim</p>
+        <a href="https://instagram.com" target="_blank" class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/5 text-gray-300 hover:bg-gradient-to-tr hover:from-pink-500 hover:to-orange-400 hover:text-white transition-all mt-auto"><i class="fa-brands fa-instagram text-xl"></i></a>
+    </div>
+
+    <div class="bg-[#140D09] border border-white/5 rounded-3xl p-6 pb-10 text-center hover:-translate-y-2 hover:border-[#D4AF37]/50 transition-all duration-300 shadow-xl group flex flex-col items-center">
+        <img src="/Assets/FotoAgnia.png" 
+             style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; transform: translateZ(0);"
+             class="w-36 h-48 rounded-2xl border-4 border-[#140D09] shadow-[0_0_0_2px_rgba(212,175,55,0.3)] mb-5 object-cover object-top antialiased">
+        <h3 class="font-bold text-white text-lg">Agniatun Maulidatun Khasanah</h3>
+        <p class="text-[10px] uppercase tracking-widest text-[#D4AF37] font-bold mb-3 mt-1">Universitas Negeri Malang</p>
+        <p class="text-xs text-gray-400 mb-6 line-clamp-3">Anggota 1</p>
+        <a href="https://instagram.com" target="_blank" class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/5 text-gray-300 hover:bg-gradient-to-tr hover:from-pink-500 hover:to-orange-400 hover:text-white transition-all mt-auto"><i class="fa-brands fa-instagram text-xl"></i></a>
+    </div>
+
+    <div class="bg-[#140D09] border border-white/5 rounded-3xl p-6 pb-10 text-center hover:-translate-y-2 hover:border-[#D4AF37]/50 transition-all duration-300 shadow-xl group flex flex-col items-center">
+        <img src="/Assets/foto roiq.png" 
+             style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; transform: translateZ(0);"
+             class="w-36 h-48 rounded-2xl border-4 border-[#140D09] shadow-[0_0_0_2px_rgba(212,175,55,0.3)] mb-5 object-cover object-top antialiased">
+        <h3 class="font-bold text-white text-lg">M. Roiqul Bihar Anwarul Wahid</h3>
+        <p class="text-[10px] uppercase tracking-widest text-[#D4AF37] font-bold mb-3 mt-1">Universitas Negeri Malang</p>
+        <p class="text-xs text-gray-400 mb-6 line-clamp-3">Anggota 2</p>
+        <a href="https://instagram.com" target="_blank" class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/5 text-gray-300 hover:bg-gradient-to-tr hover:from-pink-500 hover:to-orange-400 hover:text-white transition-all mt-auto"><i class="fa-brands fa-instagram text-xl"></i></a>
+    </div>
+
+</div>
+                
+
+    <nav class="md:hidden fixed bottom-0 inset-x-0 bg-[#140D09]/95 backdrop-blur-lg border-t border-[#D4AF37]/10 flex justify-around p-2 z-40 pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.5)]">
+        <button id="mob-home" onclick="switchTab('home')" class="nav-btn-mobile flex flex-col items-center gap-1 p-2 w-full text-[#D4AF37] active-nav rounded-xl transition">
+            <i class="fa-solid fa-house text-lg"></i><span class="text-[10px] font-bold">Beranda</span>
+        </button>
+        <button id="mob-scan" onclick="switchTab('scan')" class="nav-btn-mobile flex flex-col items-center gap-1 p-2 w-full text-gray-400 rounded-xl transition">
+            <i class="fa-solid fa-expand text-lg"></i><span class="text-[10px] font-bold">Pindai</span>
+        </button>
+        <button id="mob-profile" onclick="switchTab('profile')" class="nav-btn-mobile flex flex-col items-center gap-1 p-2 w-full text-gray-400 rounded-xl transition">
+            <i class="fa-solid fa-users text-lg"></i><span class="text-[10px] font-bold">Profil</span>
+        </button>
+    </nav>
+
+    <script src="script.js"></script>
+</body>
+</html>
