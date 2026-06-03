@@ -245,18 +245,49 @@ async function startAutoScan() {
     
     await new Promise(resolve => setTimeout(resolve, 2000)); // Simulasi deep scan
 
-    try {
+   try {
         let src = cv.imread(uploadedImageElement);
         let hsv = new cv.Mat();
         cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
         cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
 
+        // ==========================================
+        // [SISTEM BARU] MENGHITUNG PERSENTASE KULIT (SKIN PIXELS)
+        // ==========================================
+        let skinMask = new cv.Mat();
+        // Rentang HSV untuk mendeteksi kulit manusia (Asia/Indonesia)
+        let lowerSkin = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [0, 40, 60, 0]);
+        let upperSkin = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [25, 150, 255, 0]);
+        
+        // Buat masking: hanya warna yang cocok dengan kulit yang dipertahankan
+        cv.inRange(hsv, lowerSkin, upperSkin, skinMask);
+        
+        // Hitung berapa banyak piksel kulit vs total piksel gambar
+        let skinPixels = cv.countNonZero(skinMask);
+        let totalPixels = hsv.rows * hsv.cols;
+        let skinPercentage = (skinPixels / totalPixels) * 100;
+
+        // Bersihkan memori deteksi kulit agar tidak bocor (RAM aman)
+        skinMask.delete(); lowerSkin.delete(); upperSkin.delete();
+
+        // ==========================================
+        // [SISTEM SISIPAN BARU] MENGHITUNG POLA GARIS (ANTI-BATU/POLOS)
+        // ==========================================
+        let gray = new cv.Mat();
+        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+        let edges = new cv.Mat();
+        cv.Canny(gray, edges, 50, 150, 3, false);
+        let edgePixels = cv.countNonZero(edges);
+        let edgePercentage = (edgePixels / totalPixels) * 100;
+        gray.delete(); edges.delete(); // Free memory
+
+        // Hitung rata-rata warna untuk klasifikasi motif batik 
         let s = cv.mean(hsv);
         let H = s[0]; let S = s[1]; let V = s[2];
         src.delete(); hsv.delete(); // Free memory
 
         let dataHasil = {};
-        console.log(`[C-VIS Analisis] Hue: ${H.toFixed(1)} | Sat: ${S.toFixed(1)} | Val: ${V.toFixed(1)}`);
+        console.log(`[C-VIS Analisis] Hue: ${H.toFixed(1)} | Sat: ${S.toFixed(1)} | Val: ${V.toFixed(1)} | Kulit: ${skinPercentage.toFixed(1)}% | Garis: ${edgePercentage.toFixed(1)}%`);
 
         // ==========================================
         // FILTER KETAT: ANTI-WAJAH & BUKAN KAIN
@@ -265,8 +296,19 @@ async function startAutoScan() {
         if (V < 20 || V > 245 || S < 25) { 
             dataHasil = { is_batik: false }; 
         } 
-        // 2. TOLAK KULIT MANUSIA (Wajah/Tangan). Rentang ini memblokir warna peach/krem/coklat kulit.
-        else if (H >= 0 && H <= 25 && S >= 25 && S <= 95 && V >= 80 && V <= 230) {
+        // 2. [REVISI] TOLAK JIKA DETEKSI KULIT/WAJAH TERLALU DOMINAN (> 20% biar makin ketat)
+        else if (skinPercentage > 20) {
+            console.log("Terdeteksi wajah/kulit berlebihan! Interupsi dijalankan.");
+            dataHasil = { is_batik: false };
+        }
+        // 3. [SISIPAN BARU] TOLAK JIKA OBJEK TERLALU POLOS (Batu, Muka, Baju Polos)
+        else if (edgePercentage < 3.0) {
+            console.log("Objek terlalu polos/mulus! Interupsi dijalankan.");
+            dataHasil = { is_batik: false };
+        }
+        // 4. [SISIPAN BARU] TOLAK JIKA OBJEK TERLALU ACAK (Rumput, Aspal, Kerikil)
+        else if (edgePercentage > 45.0) {
+            console.log("Tekstur terlalu acak/berisik! Interupsi dijalankan.");
             dataHasil = { is_batik: false };
         }
         
@@ -352,16 +394,67 @@ function renderHasilUI(data) {
 }
 
 function exportToPDF() {
-    const element = document.getElementById('result-success-card');
+    showToast("Sedang merancang PDF elegan...", "warning");
+
+    // 1. Ambil data dari UI yang sudah discan
+    const nama = document.getElementById('res-nama').innerText;
+    const asal = document.getElementById('res-asal').innerText;
+    const desc = document.getElementById('res-deskripsi').innerText;
+    const filo = document.getElementById('res-filosofi').innerText;
+    // Ambil gambar thumbnail batik yang sedang dianalisis
+    const imgSrc = document.getElementById('res-thumbnail').src; 
+
+    // 2. Buat Template Surat/Laporan Khusus PDF (Tidak akan tampil di layar web)
+    const printArea = document.createElement('div');
+    printArea.innerHTML = `
+        <div style="padding: 40px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #140D09; background: #FFFFFF; width: 800px;">
+            
+            <div style="border-bottom: 3px solid #D4AF37; padding-bottom: 15px; margin-bottom: 25px; text-align: center;">
+                <h1 style="color: #140D09; margin: 0; font-size: 28px; text-transform: uppercase; letter-spacing: 2px;">Laporan Identifikasi Batik</h1>
+                <p style="color: #555; margin: 5px 0 0 0; font-size: 14px; font-weight: bold;">Sistem AI Computer Vision - BatikLens</p>
+            </div>
+
+            <div style="display: flex; gap: 20px; margin-bottom: 30px;">
+                <div style="flex: 1;">
+                    <img src="${imgSrc}" style="width: 100%; max-height: 250px; object-fit: cover; border-radius: 8px; border: 2px solid #eee;" />
+                </div>
+                <div style="flex: 2;">
+                    <h2 style="color: #D4AF37; margin-top: 0; font-size: 26px;">Motif ${nama}</h2>
+                    <h4 style="color: #777; margin-top: -10px; font-style: italic; font-size: 16px;">Daerah Asal: ${asal}</h4>
+                    
+                    <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 25px; font-size: 18px;">Karakteristik Visual</h3>
+                    <p style="line-height: 1.6; font-size: 14px; text-align: justify;">${desc}</p>
+                </div>
+            </div>
+
+            <div style="background-color: #FFF9E6; padding: 20px; border-left: 5px solid #D4AF37; border-radius: 5px;">
+                <h3 style="margin-top: 0; color: #140D09; font-size: 18px;">Makna & Filosofi Budaya</h3>
+                <p style="line-height: 1.6; font-size: 14px; margin-bottom: 0; text-align: justify;">${filo}</p>
+            </div>
+
+            <div style="margin-top: 50px; text-align: center; font-size: 11px; color: #999; border-top: 1px dashed #ccc; padding-top: 15px;">
+                <p>Dokumen ini dihasilkan secara otomatis oleh <b>SMARTBATIK (BatikLens)</b> - Universitas Negeri Malang.</p>
+                <p>Didukung oleh algoritma Convolutional Neural Network (CNN).</p>
+            </div>
+            
+        </div>
+    `;
+
+    // 3. Konfigurasi Kertas A4
     const opt = {
-        margin:       10,
-        filename:     'Laporan-BatikLens.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true },
+        margin:       0, // Sengaja 0 karena padding sudah kita atur di dalam template HTML di atas
+        filename:     `Laporan_BatikLens_${nama.replace(/\s+/g, '_')}.pdf`,
+        image:        { type: 'jpeg', quality: 1.0 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-    showToast("Sedang membuat PDF...", "warning");
-    html2pdf().set(opt).from(element).save().then(() => showToast("PDF berhasil diunduh!", "success"));
+
+    // 4. Eksekusi Print
+    html2pdf().set(opt).from(printArea).save().then(() => {
+        showToast("PDF Laporan berhasil diunduh!", "success");
+    }).catch((err) => {
+        showToast("Gagal membuat PDF: " + err, "error");
+    });
 }
 
 function exportToWord() {
